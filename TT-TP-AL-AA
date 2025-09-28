@@ -1,0 +1,112 @@
+-- Anti-Lag and Anti-AFK LocalScript for Roblox
+-- Place in StarterPlayerScripts
+
+local RunService = game:GetService("RunService")
+local UserGameSettings = UserSettings():GetService("UserGameSettings")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Function to optimize graphics settings (stronger optimizations, fixed invalid properties)
+local function optimizeGraphics()
+	-- Lower graphics quality to minimum
+	UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.QualityLevel1 -- Lowest quality setting
+	
+	-- Disable expensive effects
+	local lighting = game:GetService("Lighting")
+	lighting.GlobalShadows = false -- Disable shadows
+	lighting.FogEnd = 100000 -- Remove fog
+	lighting.Brightness = 1 -- Normalize brightness
+	lighting.Technology = Enum.Technology.Compatibility -- Use legacy rendering for performance
+	
+	-- Disable particle effects, trails, beams, decals, and sounds
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+			obj.Enabled = false
+		elseif obj:IsA("Decal") then
+			obj.Transparency = 1 -- Hide decals
+		elseif obj:IsA("Sound") then
+			obj.Volume = 0 -- Mute sounds
+		end
+	end
+end
+
+-- Function to clean up unused objects (stronger: more aggressive cleanup)
+local function cleanupObjects()
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and not obj.Anchored and obj.Parent then
+			-- Remove floating or unused parts below a certain height or far away
+			if obj.Position.Y < -500 or (obj.Position.Magnitude > 1000) then -- Stronger thresholds
+				obj:Destroy()
+			end
+		elseif obj:IsA("Attachment") or obj:IsA("Weld") then -- Remove unnecessary constraints
+			if not obj.Parent:IsA("Humanoid") then
+				obj:Destroy()
+			end
+		end
+	end
+end
+
+-- Function to reduce network load (stronger: disable more for distant players)
+local function optimizeNetwork()
+	-- Disable character animations and parts for distant players
+	RunService.RenderStepped:Connect(function()
+		for _, player in pairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				local distance = (LocalPlayer.Character and LocalPlayer.Character.PrimaryPart and (LocalPlayer.Character.PrimaryPart.Position - player.Character.PrimaryPart.Position).Magnitude) or math.huge
+				if distance > 30 then -- Stronger: lower distance threshold
+					local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						humanoid:ChangeState(Enum.HumanoidStateType.None) -- Disable animations
+					end
+					-- Hide distant player parts
+					for _, part in pairs(player.Character:GetChildren()) do
+						if part:IsA("BasePart") then
+							part.Transparency = 1
+						end
+					end
+				end
+			end
+		end
+	end)
+end
+
+-- Anti-AFK mechanism (jump every 5 seconds)
+local antiAFKConnection
+local function startAntiAFK(humanoid)
+	if antiAFKConnection then
+		antiAFKConnection:Disconnect()
+	end
+	antiAFKConnection = task.spawn(function()
+		while humanoid and humanoid.Parent do
+			humanoid.Jump = true
+			task.wait(5) -- Jump every 5 seconds
+		end
+	end)
+end
+
+-- Main function to run optimizations and anti-AFK
+local function initialize(character)
+	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+	local humanoid = character:WaitForChild("Humanoid")
+	
+	-- Teleport to specified coordinates
+	humanoidRootPart.CFrame = CFrame.new(Vector3.new(427.12786865234375, 131.3284149169922, 154.95379638671875))
+	
+	optimizeGraphics()
+	optimizeNetwork()
+	startAntiAFK(humanoid)
+	
+	-- Periodically clean up objects (stronger: every 30 seconds)
+	task.spawn(function()
+		while true do
+			cleanupObjects()
+			task.wait(30) -- More frequent cleanup
+		end
+	end)
+end
+
+-- Handle initial character and respawns
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+initialize(character)
+
+LocalPlayer.CharacterAdded:Connect(initialize)
