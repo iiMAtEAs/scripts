@@ -1,12 +1,40 @@
--- Anti-Lag and Teleport LocalScript for Roblox
+-- Anti-Lag + Anti-AFK + Teleport LocalScript for Roblox
 -- Place in StarterPlayerScripts
 
 local RunService = game:GetService("RunService")
 local UserGameSettings = UserSettings():GetService("UserGameSettings")
 local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
--- Function to optimize graphics settings (wrapped in pcall to avoid crashes)
+-- ✅ Create a small UI to show status
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AntiAFK_UI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 250, 0, 40)
+statusLabel.Position = UDim2.new(0.5, -125, 0, 20)
+statusLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+statusLabel.BackgroundTransparency = 0.3
+statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.TextScaled = true
+statusLabel.Text = "✅ Anti-AFK Active"
+statusLabel.Parent = screenGui
+
+-- ✅ Anti-AFK Loop
+task.spawn(function()
+	while true do
+		task.wait(60) -- every 1 minute
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new()) -- simulate right-click
+		statusLabel.Text = "✅ Anti-AFK Pinged: " .. os.date("%H:%M:%S")
+	end
+end)
+
+-- ✅ Graphics Optimization
 local function optimizeGraphics()
 	local success, err = pcall(function()
 		UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.QualityLevel1
@@ -32,7 +60,7 @@ local function optimizeGraphics()
 	end
 end
 
--- Function to clean up unused objects
+-- ✅ Clean up unused objects
 local function cleanupObjects()
 	local success, err = pcall(function()
 		for _, obj in pairs(workspace:GetDescendants()) do
@@ -52,7 +80,7 @@ local function cleanupObjects()
 	end
 end
 
--- Function to reduce network load
+-- ✅ Reduce network load
 local function optimizeNetwork()
 	local success, err = pcall(function()
 		RunService.RenderStepped:Connect(function()
@@ -75,39 +103,27 @@ local function optimizeNetwork()
 	end
 end
 
--- Main function to run optimizations, teleport, and auto-jump
+-- ✅ Main Init Function
 local function initialize(character)
 	local success, err = pcall(function()
 		local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
-		local humanoid = character:WaitForChild("Humanoid", 5)
-
-		if not humanoidRootPart or not humanoid then
-			warn("Failed to find character components")
+		if not humanoidRootPart then
+			warn("Failed to find HumanoidRootPart")
 			return
 		end
 
-		-- Teleport to specified coordinates
+		-- Teleport to specific coordinates
 		humanoidRootPart.CFrame = CFrame.new(Vector3.new(427.12786865234375, 131.3284149169922, 154.95379638671875))
 		print("Teleported to specified coordinates")
 
 		optimizeGraphics()
 		optimizeNetwork()
 
-		-- Periodically clean up objects
+		-- Clean up objects every 30 seconds
 		task.spawn(function()
 			while true do
 				cleanupObjects()
 				task.wait(30)
-			end
-		end)
-
-		-- 🔹 Make the player jump every 5 seconds
-		task.spawn(function()
-			while character and character.Parent do
-				task.wait(5)
-				if humanoid and humanoid.Parent then
-					humanoid.Jump = true
-				end
 			end
 		end)
 	end)
@@ -116,7 +132,7 @@ local function initialize(character)
 	end
 end
 
--- Handle initial character and respawns
+-- ✅ Run on spawn/respawn
 if LocalPlayer.Character then
 	initialize(LocalPlayer.Character)
 end
