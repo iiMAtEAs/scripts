@@ -1,4 +1,4 @@
--- Anti-Lag and Anti-AFK LocalScript for Roblox
+-- Anti-Lag and Teleport LocalScript for Roblox
 -- Place in StarterPlayerScripts
 
 local RunService = game:GetService("RunService")
@@ -9,17 +9,14 @@ local LocalPlayer = Players.LocalPlayer
 -- Function to optimize graphics settings (wrapped in pcall to avoid crashes)
 local function optimizeGraphics()
 	local success, err = pcall(function()
-		-- Lower graphics quality to minimum
 		UserGameSettings.SavedQualityLevel = Enum.SavedQualityLevel.QualityLevel1
-		
-		-- Disable expensive effects
+
 		local lighting = game:GetService("Lighting")
 		lighting.GlobalShadows = false
 		lighting.FogEnd = 100000
 		lighting.Brightness = 1
 		lighting.Technology = Enum.Technology.Compatibility
-		
-		-- Disable particle effects, trails, beams, decals, and sounds
+
 		for _, obj in pairs(workspace:GetDescendants()) do
 			if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
 				obj.Enabled = false
@@ -35,13 +32,13 @@ local function optimizeGraphics()
 	end
 end
 
--- Function to clean up unused objects (wrapped in pcall)
+-- Function to clean up unused objects
 local function cleanupObjects()
 	local success, err = pcall(function()
 		for _, obj in pairs(workspace:GetDescendants()) do
 			if obj:IsA("BasePart") and not obj.Anchored and obj.Parent then
 				if obj.Position.Y < -500 or (obj.Position.Magnitude > 1000) then
-					pcall(function() obj:Destroy() end) -- Avoid errors on server-owned objects
+					pcall(function() obj:Destroy() end)
 				end
 			elseif obj:IsA("Attachment") or obj:IsA("Weld") then
 				if not obj.Parent:IsA("Humanoid") then
@@ -55,7 +52,7 @@ local function cleanupObjects()
 	end
 end
 
--- Function to reduce network load (wrapped in pcall)
+-- Function to reduce network load
 local function optimizeNetwork()
 	local success, err = pcall(function()
 		RunService.RenderStepped:Connect(function()
@@ -63,10 +60,6 @@ local function optimizeNetwork()
 				if player ~= LocalPlayer and player.Character then
 					local distance = (LocalPlayer.Character and LocalPlayer.Character.PrimaryPart and player.Character.PrimaryPart and (LocalPlayer.Character.PrimaryPart.Position - player.Character.PrimaryPart.Position).Magnitude) or math.huge
 					if distance > 30 then
-						local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-						if humanoid then
-							pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.None) end)
-						end
 						for _, part in pairs(player.Character:GetChildren()) do
 							if part:IsA("BasePart") then
 								part.Transparency = 1
@@ -82,55 +75,39 @@ local function optimizeNetwork()
 	end
 end
 
--- Anti-AFK mechanism (jump every 5 seconds with state check)
-local antiAFKConnection
-local function startAntiAFK(humanoid)
-	if antiAFKConnection then
-		antiAFKConnection:Disconnect()
-	end
-	antiAFKConnection = task.spawn(function()
-		while humanoid and humanoid.Parent do
-			-- Check if humanoid can jump (not swimming, seated, etc.)
-			local state = humanoid:GetState()
-			if state == Enum.HumanoidStateType.Running or state == Enum.HumanoidStateType.RunningNoPhysics or state == Enum.HumanoidStateType.Landed then
-				humanoid.Jump = true
-				print("Jump triggered for anti-AFK") -- Debug output
-			else
-				-- Try to force a jumpable state
-				pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
-				humanoid.Jump = true
-				print("Attempted jump in state: " .. tostring(state)) -- Debug output
-			end
-			task.wait(5)
-		end
-		print("Anti-AFK loop stopped (humanoid destroyed)")
-	end)
-end
-
--- Main function to run optimizations and anti-AFK
+-- Main function to run optimizations, teleport, and auto-jump
 local function initialize(character)
 	local success, err = pcall(function()
 		local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
 		local humanoid = character:WaitForChild("Humanoid", 5)
-		
+
 		if not humanoidRootPart or not humanoid then
-			warn("Failed to find HumanoidRootPart or Humanoid")
+			warn("Failed to find character components")
 			return
 		end
-		
+
 		-- Teleport to specified coordinates
 		humanoidRootPart.CFrame = CFrame.new(Vector3.new(427.12786865234375, 131.3284149169922, 154.95379638671875))
 		print("Teleported to specified coordinates")
-		
+
 		optimizeGraphics()
 		optimizeNetwork()
-		startAntiAFK(humanoid)
-		
+
 		-- Periodically clean up objects
 		task.spawn(function()
 			while true do
 				cleanupObjects()
 				task.wait(30)
+			end
+		end)
+
+		-- 🔹 Make the player jump every 5 seconds
+		task.spawn(function()
+			while character and character.Parent do
+				task.wait(5)
+				if humanoid and humanoid.Parent then
+					humanoid.Jump = true
+				end
 			end
 		end)
 	end)
